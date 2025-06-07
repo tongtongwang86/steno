@@ -22,10 +22,10 @@
         zephyr,code-partition = &code_partition;
         zephyr,sram = &sram0;
         zephyr,flash = &flash0;
-        zmk,battery = &vbatt;
+        zmk,battery = &bq27427;
         zmk,kscan = &kscan0;
         zmk,physical-layout = &layout_60_ansi;
-        zmk,underglow = &led_strip;
+        // zmk,underglow = &led_strip;
     };
 
     default_transform: keymap_transform_0 {
@@ -82,17 +82,35 @@ RC(0,13)  RC(0,14)  RC(0,15) RC(0,16) RC(0,17) RC(0,18) RC(0,19) RC(0,20) RC(0,2
     };
 
     // Node name must match original "EXT_POWER" label to preserve user settings.
-    EXT_POWER {
-        compatible = "zmk,ext-power-generic";
-        control-gpios = <&gpio0 5 GPIO_ACTIVE_LOW>;
-    };
+    // EXT_POWER {
+    //     compatible = "zmk,ext-power-generic";
+    //     control-gpios = <&gpio0 5 GPIO_ACTIVE_LOW>;
+    // };
 
-    vbatt: vbatt {
-        compatible = "zmk,battery-voltage-divider";
-        io-channels = <&adc 2>;
-        output-ohms = <2000000>;
-        full-ohms = <(2000000 + 806000)>;
-    };
+  
+};
+
+&i2c0 {
+
+	status = "okay";
+
+	clock-frequency = <I2C_BITRATE_STANDARD>;
+	pinctrl-0 = <&i2c0_default>;
+	pinctrl-1 = <&i2c0_sleep>;
+	pinctrl-names = "default", "sleep";
+	
+	bq27427: bq27427@55 {
+		compatible = "ti,bq274xx";
+		reg = <0x55>;
+		design-voltage = <3700>;
+		design-capacity = <400>;
+		taper-current = <90>;
+		terminate-voltage = <3000>;
+		// int-gpios = <&gpio0 5 GPIO_ACTIVE_LOW>;
+		status = "okay";
+
+	};
+
 };
 
 &adc {
@@ -119,19 +137,19 @@ RC(0,13)  RC(0,14)  RC(0,15) RC(0,16) RC(0,17) RC(0,18) RC(0,19) RC(0,20) RC(0,2
     pinctrl-names = "default", "sleep";
     status = "okay";
 
-    led_strip: ws2812@0 {
-        compatible = "worldsemi,ws2812-spi";
+    // led_strip: ws2812@0 {
+    //     compatible = "worldsemi,ws2812-spi";
 
-        /* SPI */
-        reg = <0>; /* ignored, but necessary for SPI bindings */
-        spi-max-frequency = <4000000>;
+    //     /* SPI */
+    //     reg = <0>; /* ignored, but necessary for SPI bindings */
+    //     spi-max-frequency = <4000000>;
 
-        /* WS2812 */
-        chain-length = <12>; /* LED strip length */
-        spi-one-frame = <0x70>;
-        spi-zero-frame = <0x40>;
-        color-mapping = <LED_COLOR_ID_GREEN LED_COLOR_ID_RED LED_COLOR_ID_BLUE>;
-    };
+    //     /* WS2812 */
+    //     chain-length = <12>; /* LED strip length */
+    //     spi-one-frame = <0x70>;
+    //     spi-zero-frame = <0x40>;
+    //     color-mapping = <LED_COLOR_ID_GREEN LED_COLOR_ID_RED LED_COLOR_ID_BLUE>;
+    // };
 };
 
 zephyr_udc0: &usbd {
