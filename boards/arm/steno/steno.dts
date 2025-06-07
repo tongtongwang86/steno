@@ -25,7 +25,7 @@
         zmk,battery = &bq27427;
         zmk,kscan = &kscan0;
         zmk,physical-layout = &layout_60_ansi;
-        zephyr,display = &ssd1306;
+        zephyr,display = &oled;
         // zmk,underglow = &led_strip;
     };
 
@@ -112,24 +112,22 @@ RC(0,13)  RC(0,14)  RC(0,15) RC(0,16) RC(0,17) RC(0,18) RC(0,19) RC(0,20) RC(0,2
 
 	};
 
- ssd1306: ssd1306@3c {
-    compatible = "solomon,ssd1306fb-i2c";
-    reg = <0x3c>;
-    label = "SSD1306";
-    width = <128>;
-    height = <64>;
-    segment-offset = <0>;
-    page-offset = <0>;
-    display-offset = <0>;
-    multiplex-ratio = <63>;
-    precharge-period = <0x1F>;
-    com-invert = <0>;
-    com-pin-config = <0x12>;
-    contrast = <0x7F>;
-    i2c-max-frequency = <400000>;
-    status = "okay";
-};
 
+    oled: ssd1306@3c {
+        compatible = "solomon,ssd1306fb";
+        reg = <0x3c>;
+        label = "DISPLAY";
+        width = <128>;
+        height = <32>;
+        segment-offset = <0>;
+        page-offset = <0>;
+        display-offset = <0>;
+        multiplex-ratio = <31>;
+        segment-remap;
+        com-invdir;
+        com-sequential;
+        prechargep = <0x22>;
+    };
 
 };
 
