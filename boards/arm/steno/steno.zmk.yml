@@ -1,0 +1,13 @@
+file_format: "1"
+id: steno
+name: steno
+type: board
+arch: arm
+features:
+  - keys
+  - underglow
+  - studio
+outputs:
+  - usb
+  - ble
+url: https://tongtonginc.com
