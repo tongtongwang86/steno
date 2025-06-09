@@ -112,7 +112,7 @@ RC(0,13)  RC(0,14)  RC(0,15) RC(0,16) RC(0,17) RC(0,18) RC(0,19) RC(0,20) RC(0,2
 	};
 
 
-	ssd1306_ssd1306_128x32: ssd1306@3c {
+	oled: ssd1306@3c {
 		compatible = "solomon,ssd1306fb";
 		reg = <0x3c>;
 		width = <128>;
