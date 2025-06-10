@@ -121,9 +121,9 @@ RC(0,13)  RC(0,14)  RC(0,15) RC(0,16) RC(0,17) RC(0,18) RC(0,19) RC(0,20) RC(0,2
 		page-offset = <0>;
 		display-offset = <0>;
 		multiplex-ratio = <31>;
-		segment-remap;
-		com-invdir;
-		com-sequential;
+		// segment-remap;
+		// com-invdir;
+		// com-sequential;
 		prechargep = <0x22>;
 	};
 
