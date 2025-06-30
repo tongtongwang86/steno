@@ -22,7 +22,7 @@
         zephyr,code-partition = &code_partition;
         zephyr,sram = &sram0;
         zephyr,flash = &flash0;
-        zmk,battery = &fuelgauge; 
+        zmk,battery = &vbatt;
         zmk,kscan = &kscan0;
         zmk,physical-layout = &layout_60_ansi;
         zephyr,display = &oled;
@@ -82,6 +82,12 @@ RC(0,13)  RC(0,14)  RC(0,15) RC(0,16) RC(0,17) RC(0,18) RC(0,19) RC(0,20) RC(0,2
         };
     };
 
+    vbatt: vbatt {
+        compatible = "zmk,battery-voltage-divider";
+        io-channels = <&adc 6>;
+        output-ohms = <2000000>;
+        full-ohms = <(2000000 + 806000)>;
+    };
     // Node name must match original "EXT_POWER" label to preserve user settings.
     // EXT_POWER {
     //     compatible = "zmk,ext-power-generic";
@@ -111,15 +117,15 @@ RC(0,13)  RC(0,14)  RC(0,15) RC(0,16) RC(0,17) RC(0,18) RC(0,19) RC(0,20) RC(0,2
 
 	// };
 
-    fuelgauge: bq274xx@55 {
-        compatible = "ti,bq274xx";
-        reg = <0x55>;
-        design-voltage = <3700>; //Battery Design Voltage in mV
-        design-capacity = <400>; //Battery Design Capacity in mAh
-        taper-current = <2>; //Battery Taper current in mAh
-        terminate-voltage = <2750>; //Battery Terminate Voltage in mV
-        int-gpios = <&gpio1 1 GPIO_ACTIVE_LOW>;
-    };
+    // fuelgauge: bq274xx@55 {
+    //     compatible = "ti,bq274xx";
+    //     reg = <0x55>;
+    //     design-voltage = <3700>; //Battery Design Voltage in mV
+    //     design-capacity = <400>; //Battery Design Capacity in mAh
+    //     taper-current = <2>; //Battery Taper current in mAh
+    //     terminate-voltage = <2750>; //Battery Terminate Voltage in mV
+    //     int-gpios = <&gpio1 1 GPIO_ACTIVE_LOW>;
+    // };
 
 
 	oled: ssd1306@3c {
