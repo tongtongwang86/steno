@@ -6744,6 +6744,50 @@
 			(embedded_fonts no)
 		)
 	)
+	(text "Previous\nsong"
+		(exclude_from_sim no)
+		(at 469.392 100.33 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+				(color 0 0 0 1)
+			)
+		)
+		(uuid "0641da51-0d39-4056-b87a-874e18ba4872")
+	)
+	(text "Bluetooth \ndevice 4"
+		(exclude_from_sim no)
+		(at 501.904 89.916 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+				(color 0 0 0 1)
+			)
+		)
+		(uuid "16abe79f-4dda-48f6-a02c-ba996b56b258")
+	)
+	(text "Bluetooth \ndevice 2"
+		(exclude_from_sim no)
+		(at 480.314 89.916 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+				(color 0 0 0 1)
+			)
+		)
+		(uuid "1b6392b2-10e8-41b1-9a2c-244945e4035a")
+	)
+	(text "Next\nsong"
+		(exclude_from_sim no)
+		(at 490.728 100.584 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+				(color 0 0 0 1)
+			)
+		)
+		(uuid "3210dbc2-37d3-4908-9c4f-33b1262886a1")
+	)
 	(text "USB charge in"
 		(exclude_from_sim no)
 		(at -120.015 -18.415 0)
@@ -6766,6 +6810,39 @@
 		)
 		(uuid "43b7427a-5056-4973-abdd-91d621dced19")
 	)
+	(text "Pause"
+		(exclude_from_sim no)
+		(at 480.06 100.33 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+				(color 0 0 0 1)
+			)
+		)
+		(uuid "52283703-a65f-4cda-8912-429f72bae19c")
+	)
+	(text "Bluetooth \ndevice 3"
+		(exclude_from_sim no)
+		(at 490.982 89.916 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+				(color 0 0 0 1)
+			)
+		)
+		(uuid "585af96f-5d08-481b-a4f5-da55df4142f0")
+	)
+	(text "Brightness \ndown"
+		(exclude_from_sim no)
+		(at 437.896 100.584 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+				(color 0 0 0 1)
+			)
+		)
+		(uuid "855287bf-faea-4ff1-9a08-db52cf954492")
+	)
 	(text "3V REGULATOR"
 		(exclude_from_sim no)
 		(at 78.74 -3.81 0)
@@ -6775,6 +6852,39 @@
 			)
 		)
 		(uuid "a95e65ae-ce63-4b4f-9992-d3ee94b621a8")
+	)
+	(text "Bluetooth \ndevice 5"
+		(exclude_from_sim no)
+		(at 512.318 89.916 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+				(color 0 0 0 1)
+			)
+		)
+		(uuid "b3cfe950-70fb-4acb-8aaa-d7d0f625af1b")
+	)
+	(text "Brightness \nup"
+		(exclude_from_sim no)
+		(at 448.564 100.584 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+				(color 0 0 0 1)
+			)
+		)
+		(uuid "bb2eacd3-0645-4c7f-b249-be165944808f")
+	)
+	(text "Bluetooth \ndevice 1"
+		(exclude_from_sim no)
+		(at 469.646 89.916 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+				(color 0 0 0 1)
+			)
+		)
+		(uuid "d70c4705-c097-44ee-979d-3ac9f5fe1ee8")
 	)
 	(text "0x55\n"
 		(exclude_from_sim no)
@@ -6797,6 +6907,50 @@
 			(justify left bottom)
 		)
 		(uuid "e0341da4-9462-44ff-a8d2-6c44531412f2")
+	)
+	(text "mute"
+		(exclude_from_sim no)
+		(at 437.642 90.17 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+				(color 0 0 0 1)
+			)
+		)
+		(uuid "ead05a5f-4089-4a7a-a2a4-a0a950c20c15")
+	)
+	(text "Vol Up"
+		(exclude_from_sim no)
+		(at 448.31 89.916 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+				(color 0 0 0 1)
+			)
+		)
+		(uuid "ee6dfbf6-87ba-4c9d-a076-b9e75dd286af")
+	)
+	(text "Vol down"
+		(exclude_from_sim no)
+		(at 426.72 89.916 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+				(color 0 0 0 1)
+			)
+		)
+		(uuid "ef279a4f-d074-4b02-aa8c-e3fed2fb8fe7")
+	)
+	(text "Bluetooth \nRemove \nBond"
+		(exclude_from_sim no)
+		(at 459.232 94.234 0)
+		(effects
+			(font
+				(size 1.016 1.016)
+				(color 0 0 0 1)
+			)
+		)
+		(uuid "f54b9780-77fa-4ffb-a5f9-1ececf18d9eb")
 	)
 	(junction
 		(at 207.01 148.59)
@@ -23626,7 +23780,7 @@
 				)
 			)
 		)
-		(property "Value" "0.1uF"
+		(property "Value" "100nf"
 			(at 226.06 160.655 0)
 			(effects
 				(font
