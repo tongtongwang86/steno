@@ -126,11 +126,11 @@ zephyr_udc0: &usbd { status = "okay"; };
 		 * see docs/MEMORY_MAP.md.
 		 */
 		code_partition: partition@0 {
-			reg = <0x00000000 0x00044000>;   /* 272K: 194K used */
+			reg = <0x00000000 0x0003c000>;   /* 240K: 205K used */
 		};
 
-		dict_partition: partition@44000 {
-			reg = <0x00044000 0x000b4000>;   /* 720K: 694K image */
+		dict_partition: partition@3c000 {
+			reg = <0x0003c000 0x000bc000>;   /* 752K */
 		};
 
 		storage_partition: partition@f8000 {

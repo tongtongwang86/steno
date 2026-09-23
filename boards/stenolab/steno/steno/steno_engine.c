@@ -4,6 +4,7 @@
  */
 
 #include "steno_engine.h"
+#include "steno_ortho.h"
 #include <string.h>
 
 /* Plover's SUFFIX_KEYS for English Stenotype, in its order. */
@@ -28,11 +29,28 @@ static const char KEY_CHARS[23] = {
 		    STENO_L_R | STENO_G_R | STENO_T_R | STENO_S_R | \
 		    STENO_D_R | STENO_Z_R)
 
+/*
+ * Plover's NUMBERS map, by bit index. With the number key down, these keys
+ * print as digits and the '#' itself disappears; unmapped keys stay as
+ * letters. So #SO is "10", #ROS is "R0S", #S-T is "1-9".
+ */
+static const char NUM_CHARS[23] = {
+	0,   '1', '2', 0,   '3', 0,   '4', 0,   '5', '0', 0,
+	0,   0,   '6', 0,   '7', 0,   '8', 0,   '9', 0,   0,   0
+};
+#define NUMBER_MAPPED_KEYS                                                 \
+	(STENO_S_L | STENO_T_L | STENO_P_L | STENO_H_L | STENO_A |         \
+	 STENO_O | STENO_F_R | STENO_P_R | STENO_L_R | STENO_T_R)
+
 int steno_format_stroke(uint32_t stroke, char *out, size_t outsz)
 {
 	size_t n = 0;
 
 	stroke &= STENO_KEY_MASK;
+
+	/* Number mode only engages if '#' is down AND something maps. */
+	bool numeric = (stroke & STENO_NUM) && (stroke & NUMBER_MAPPED_KEYS);
+
 	bool need_hyphen = !(stroke & IMPLICIT_HYPHEN) && (stroke & RIGHT_KEYS);
 
 	for (int i = 0; i < 23; i++) {
@@ -41,11 +59,16 @@ int steno_format_stroke(uint32_t stroke, char *out, size_t outsz)
 				return -1;
 			out[n++] = '-';
 		}
-		if (stroke & (1u << i)) {
-			if (n + 1 >= outsz)
-				return -1;
-			out[n++] = KEY_CHARS[i];
-		}
+		if (!(stroke & (1u << i)))
+			continue;
+		if (numeric && i == 0)
+			continue;                      /* '#' is implied */
+
+		char c = (numeric && NUM_CHARS[i]) ? NUM_CHARS[i] : KEY_CHARS[i];
+
+		if (n + 1 >= outsz)
+			return -1;
+		out[n++] = c;
 	}
 	if (n >= outsz)
 		return -1;
@@ -66,6 +89,9 @@ typedef struct {
 	bool     space_next;   /* next word wants a leading space */
 	uint8_t  case_next;
 	bool     last_glue;
+	uint16_t word_start;   /* where the current word begins in buf */
+	bool     ortho_ok;     /* a bare {^} suppresses the next suffix join */
+	bool     head_mid_word;/* the retained window opens mid-word */
 } fmt;
 
 static void put(fmt *f, char c)
@@ -98,16 +124,29 @@ static void emit_text(fmt *f, const char *s, size_t n,
 	if (space)
 		put(f, ' ');
 
+	/* A run that does not attach backwards begins a new word. */
+	if (!attach_before) {
+		f->word_start = f->len;
+		f->head_mid_word = false;
+	}
+
+	bool first = true;
+
 	for (size_t i = 0; i < n; i++) {
 		char c = s[i];
 
-		if (i == 0) {
+		/* Plover unescapes atoms: \{ \} \\ are literals. */
+		if (c == '\\' && i + 1 < n)
+			c = s[++i];
+
+		if (first) {
 			switch (f->case_next) {
 			case CASE_CAP:   c = up(c); break;
 			case CASE_LOWER: c = dn(c); break;
 			case CASE_UPPER: c = up(c); break;
 			default: break;
 			}
+			first = false;
 		} else if (f->case_next == CASE_UPPER) {
 			c = up(c);
 		}
@@ -116,6 +155,56 @@ static void emit_text(fmt *f, const char *s, size_t n,
 	f->case_next = CASE_NONE;
 	f->space_next = !attach_after;
 	f->last_glue = glue;
+	f->ortho_ok = true;
+}
+
+/*
+ * Apply an attaching suffix with English spelling rules, rewriting the word
+ * already in the buffer. Plover expresses this as "backspace the changed
+ * tail and retype it"; here the word is simply rebuilt in place and the
+ * engine's output diff works out the backspaces by itself.
+ */
+static void emit_suffix(fmt *f, const char *s, size_t n, bool attach_after)
+{
+	char word[96], joined[160], suffix[64];
+
+	uint16_t wlen = f->len - f->word_start;
+
+	/*
+	 * If the window opens mid-word and nothing has started a new word
+	 * since, the word we would rewrite began before the retained text.
+	 * Rewinding would clobber output already sent, so attach plainly.
+	 * Retirement itself must not be blocked to avoid this: n_seg would
+	 * pin at the maximum and the newest segment would be overwritten.
+	 */
+	if (f->word_start == 0 && f->head_mid_word) {
+		emit_text(f, s, n, true, attach_after, false);
+		return;
+	}
+
+	if (wlen == 0 || wlen >= sizeof(word) || n >= sizeof(suffix)) {
+		emit_text(f, s, n, true, attach_after, false);
+		return;
+	}
+	memcpy(word, f->buf + f->word_start, wlen);
+	word[wlen] = '\0';
+	memcpy(suffix, s, n);
+	suffix[n] = '\0';
+
+	if (steno_add_suffix(word, suffix, joined, sizeof(joined)) < 0) {
+		emit_text(f, s, n, true, attach_after, false);
+		return;
+	}
+
+	/* rewind to the start of the word and lay down the joined form */
+	f->len = f->word_start;
+	for (const char *p = joined; *p; p++)
+		put(f, *p);
+
+	f->case_next = CASE_NONE;
+	f->space_next = !attach_after;
+	f->last_glue = false;
+	f->ortho_ok = true;
 }
 
 /*
@@ -134,6 +223,15 @@ static void apply_meta(fmt *f, const char *m, size_t n)
 		f->space_next = false;
 		return;
 	}
+	if (n == 1 && m[0] == '^') {
+		/*
+		 * A bare {^} is Plover's explicit "do not auto-correct the
+		 * next join" break, not just an attach.
+		 */
+		f->space_next = false;
+		f->ortho_ok = false;
+		return;
+	}
 
 	/* Commands and key combos: no output, no state change. */
 	if (m[0] == '#' || m[0] == ':')
@@ -148,8 +246,29 @@ static void apply_meta(fmt *f, const char *m, size_t n)
 	if (n == 1 && m[0] == '>')           { f->case_next = CASE_LOWER; return; }
 	if (n == 1 && m[0] == '<')           { f->case_next = CASE_UPPER; return; }
 
-	/* Carry capitalisation across an attach. */
-	if (n == 1 && m[0] == '~') return;
+	/*
+	 * Carry capitalisation: {~|text}, optionally with attach flags.
+	 * The pending case is carried past this atom rather than consumed,
+	 * and the text after "~|" is emitted normally.
+	 */
+	{
+		const char *cc = m;
+		size_t ccn = n;
+		bool cb = false, ca = false;
+
+		if (ccn && cc[0] == '^') { cb = true; cc++; ccn--; }
+		if (ccn >= 2 && cc[0] == '~' && cc[1] == '|') {
+			cc += 2; ccn -= 2;
+			if (ccn && cc[ccn - 1] == '^') { ca = true; ccn--; }
+
+			uint8_t carried = f->case_next;
+
+			emit_text(f, cc, ccn, cb, ca, false);
+			if (ccn == 0)
+				f->case_next = carried;
+			return;
+		}
+	}
 
 	/* Glue: {&x} joins to adjacent glued atoms. */
 	if (m[0] == '&') {
@@ -173,6 +292,28 @@ static void apply_meta(fmt *f, const char *m, size_t n)
 	if (tn == 1 && (t[0] == ',' || t[0] == ';' || t[0] == ':')) {
 		emit_text(f, t, tn, true, false, false);
 		return;
+	}
+
+	/*
+	 * Plover applies orthography when the atom attaches backwards, has
+	 * text, is not purely whitespace, was not preceded by a {^} break,
+	 * and - if it also attaches forwards - contains a word boundary.
+	 */
+	if (attach_before && tn > 0 && f->ortho_ok && f->len > f->word_start) {
+		bool infix_ok = true;
+
+		if (attach_after) {
+			char tmp[64];
+			size_t k = tn < sizeof(tmp) - 1 ? tn : sizeof(tmp) - 1;
+
+			memcpy(tmp, t, k);
+			tmp[k] = '\0';
+			infix_ok = steno_has_word_boundary(tmp);
+		}
+		if (infix_ok) {
+			emit_suffix(f, t, tn, attach_after);
+			return;
+		}
 	}
 
 	emit_text(f, t, tn, attach_before, attach_after, glue);
@@ -379,6 +520,9 @@ static void render_all(steno_engine *e, char *buf, uint16_t cap, uint16_t *len,
 		.space_next = e->head.space_next,
 		.case_next  = e->head.case_next,
 		.last_glue  = e->head.last_glue,
+		.word_start = 0,
+		.ortho_ok   = true,
+		.head_mid_word = !e->head.space_next,
 	};
 
 	for (uint8_t i = 0; i < e->n_seg; i++) {

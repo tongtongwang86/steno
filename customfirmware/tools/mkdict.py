@@ -360,19 +360,55 @@ def zigzag(n):
 SUFFIXES = [b'ing', b'est', b'es', b'ed', b'ly', b'er', b's', b'd']
 
 
+# Right-bank suffix keys, by bit: -Z -D -S -G. Must match the engine's
+# SUFFIX_KEYS, which are Plover's for English Stenotype.
+SUFFIX_KEY_BITS = (1 << 22, 1 << 21, 1 << 20, 1 << 18)
+
+
 def drop_derivable(records):
-    """Remove entries whose translation is another translation plus a regular
-    suffix. The orthography engine regenerates them at runtime."""
+    """Remove entries the runtime can rebuild from a shorter entry.
+
+    An entry is only droppable when BOTH halves are derivable:
+
+      * its translation is another translation plus a regular suffix, and
+      * its STROKE is another entry's stroke plus one of the suffix keys,
+        so the engine's implicit-suffix lookup actually reaches it.
+
+    Testing only the translation - which an earlier version of this did -
+    drops entries whose stroke has no suffix key at all. The engine then
+    cannot rebuild them and they are simply missing: measured at 26,099
+    entries dropped of which only 11,769 were genuinely derivable, costing
+    6.2% accuracy against Plover. Both halves are now required.
+    """
     vals = set(v for _, v in records)
+    by_key = {k: v for k, v in records}
     out = []
     dropped = 0
+
     for k, v in records:
-        hit = False
+        value_ok = False
         for suf in SUFFIXES:
             if v.endswith(suf) and len(v) - len(suf) >= 3 and v[:-len(suf)] in vals:
-                hit = True
+                value_ok = True
                 break
-        if hit:
+        if not value_ok:
+            out.append((k, v))
+            continue
+
+        # last stroke, big-endian 3 bytes
+        last = (k[-3] << 16) | (k[-2] << 8) | k[-1]
+        stroke_ok = False
+        for bit in SUFFIX_KEY_BITS:
+            if not (last & bit):
+                continue
+            base = last & ~bit
+            cand = k[:-3] + bytes([(base >> 16) & 0xff,
+                                   (base >> 8) & 0xff, base & 0xff])
+            if cand in by_key:
+                stroke_ok = True
+                break
+
+        if stroke_ok:
             dropped += 1
         else:
             out.append((k, v))
