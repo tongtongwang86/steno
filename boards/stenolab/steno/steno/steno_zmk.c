@@ -24,6 +24,7 @@
 
 #include "steno_engine.h"
 #include "steno_layout.h"
+#include "steno_combo.h"
 #include "steno_display.h"
 #include "sdic.h"
 
@@ -81,10 +82,9 @@ static const uint32_t ascii_key[128] = {
 /* Inter-report spacing. Hosts drop keystrokes if reports arrive too fast. */
 #define TAP_MS CONFIG_STENO_ZMK_TAP_MS
 
-static void tap_encoded(uint32_t encoded)
+static void tap_raw(uint8_t mods, uint16_t usage)
 {
-	uint8_t mods = SELECT_MODS(encoded);
-	zmk_key_t key = ZMK_HID_USAGE_ID(encoded);
+	zmk_key_t key = (zmk_key_t)usage;
 
 	if (mods) {
 		zmk_hid_register_mods(mods);
@@ -101,6 +101,15 @@ static void tap_encoded(uint32_t encoded)
 		zmk_endpoint_send_report(HID_USAGE_KEY);
 	}
 	k_msleep(TAP_MS);
+}
+
+/*
+ * STENO_MOD_* are the HID modifier bits in HID's own order, which is also
+ * ZMK's MOD_LCTL..MOD_RGUI, so the mask passes straight through.
+ */
+static void tap_encoded(uint32_t encoded)
+{
+	tap_raw(SELECT_MODS(encoded), ZMK_HID_USAGE_ID(encoded));
 }
 
 static void type_out(uint16_t backspaces, const char *text)
@@ -232,6 +241,15 @@ static void steno_thread(void *a, void *b, void *c)
 		steno_display_set_stats(&st);
 
 		type_out(act.backspaces, act.text);
+
+		/*
+		 * Key taps from {#...}, after the text so a brief that types
+		 * a word and then Enter lands in that order. These are not
+		 * undoable: once sent to the host they are gone, and `*` can
+		 * only retract text. Plover behaves the same way.
+		 */
+		for (uint8_t i = 0; i < act.n_combos; i++)
+			tap_raw(act.combos[i].mods, act.combos[i].usage);
 	}
 }
 

@@ -532,18 +532,32 @@ def main():
     args = ap.parse_args()
 
     merged = {}
-    for path in args.json:
+    pinned_strokes = set()
+    for i, path in enumerate(args.json):
         with open(path) as f:
-            merged.update(json.load(f))
-    print("loaded %d entries from %d file(s)" % (len(merged), len(args.json)))
+            d = json.load(f)
+        merged.update(d)
+        if i > 0:
+            # Anything after the base dictionary is a deliberate user choice
+            # (their own briefs, their {#...} bindings). Trimming must never
+            # silently drop it, so mark it exempt.
+            pinned_strokes.update(d)
+    print("loaded %d entries from %d file(s)%s" %
+          (len(merged), len(args.json),
+           ", %d pinned" % len(pinned_strokes) if pinned_strokes else ""))
 
     records = []
+    pinned = set()
     bad = 0
     for k, v in merged.items():
         try:
-            records.append((pack_key(k), v.encode('utf-8')))
+            pk = pack_key(k)
         except Exception:
             bad += 1
+            continue
+        records.append((pk, v.encode('utf-8')))
+        if k in pinned_strokes:
+            pinned.add(pk)
     if bad:
         print("  skipped %d unparseable strokes" % bad)
 
@@ -561,8 +575,11 @@ def main():
                 rank[line.strip().encode()] = i
 
     def priority(rec):
-        """Lower is more important: known-frequent words first, then short keys."""
+        """Lower is more important: pinned first, then known-frequent words,
+        then short keys."""
         k, v = rec
+        if k in pinned:
+            return (-1, 0)
         return (rank.get(v.strip(), 1 << 30), len(k))
 
     if args.max_entries and len(records) > args.max_entries:

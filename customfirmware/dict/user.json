@@ -1,0 +1,17 @@
+{
+  "R-R": "{#Return}",
+  "TA-B": "{#Tab}",
+  "STPHA-B": "{#shift(Tab)}",
+  "SKA*EP": "{#Escape}",
+  "KPO*EP": "{#control(c)}",
+  "PWA*EFT": "{#control(v)}",
+  "K*UT": "{#control(x)}",
+  "TPHR*UPBD": "{#control(z)}",
+  "SA*EFRB": "{#control(s)}",
+  "HRA*EFT": "{#Left}",
+  "R-GT": "{#Right}",
+  "HO*PL": "{#Home}",
+  "TPR*EFR": "{#F5}",
+  "TKPWO*UPB": "{#Down}",
+  "*EPBLD": "{#End}"
+}

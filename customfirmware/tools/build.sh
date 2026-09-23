@@ -3,6 +3,7 @@
 #
 #   ./tools/build.sh            compile the host verifier
 #   ./tools/build.sh dict       compile main.json -> dict_full.sdic
+#   ./tools/build.sh ship       compile main.json + dict/user.json to fit flash
 #   ./tools/build.sh trim       compile with the elimination passes
 #   ./tools/build.sh verify     exhaustively verify every entry
 #   ./tools/build.sh size       report the Cortex-M4 footprint of the reader
@@ -27,6 +28,13 @@ host)
 	;;
 dict)
 	python3 tools/mkdict.py "$JSON" -o dict_full.sdic --max-rules 6000
+	;;
+ship)
+	# The shipped image: the full dictionary plus the user briefs, trimmed
+	# to the dict partition. User entries are listed last so they win.
+	python3 tools/mkdict.py "$JSON" dict/user.json -o dict_ship.sdic \
+		--max-rules 6000 --max-bytes 752K \
+		${FREQ:+--freq "$FREQ"}
 	;;
 trim)
 	python3 tools/mkdict.py "$JSON" -o dict_trim.sdic --max-rules 6000 \

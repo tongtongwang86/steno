@@ -5,6 +5,7 @@
 
 #include "steno_engine.h"
 #include "steno_ortho.h"
+#include "steno_combo.h"
 #include <string.h>
 
 /* Plover's SUFFIX_KEYS for English Stenotype, in its order. */
@@ -576,7 +577,7 @@ static steno_undo_rec *undo_pop(steno_engine *e)
 /* Render the retained window and diff it against what was last emitted. */
 static steno_action commit(steno_engine *e, bool record)
 {
-	steno_action act = { 0, e->out, 0 };
+	steno_action act = { 0, e->out, 0, NULL, 0 };
 	char newbuf[STENO_RENDER_BUF];
 	uint16_t newlen = 0;
 	uint16_t starts[STENO_MAX_SEGMENTS];
@@ -595,6 +596,8 @@ static steno_action commit(steno_engine *e, bool record)
 	memcpy(e->out, newbuf + common, act.text_len);
 	e->out[act.text_len] = '\0';
 	act.text = e->out;
+	act.combos = e->combo_buf;
+	act.n_combos = e->n_combos;
 
 	memcpy(e->render, newbuf, newlen);
 	e->render_len = newlen;
@@ -667,6 +670,7 @@ static steno_action do_undo(steno_engine *e)
 	steno_undo_rec *r = undo_pop(e);
 
 	e->stat_undos++;
+	e->n_combos = 0;
 
 	if (!r) {
 		/* Nothing recoverable: say so by emitting nothing. */
@@ -767,6 +771,29 @@ steno_action steno_engine_stroke(steno_engine *e, uint32_t stroke)
 		sg->english[n] = '\0';
 	}
 	e->n_seg++;
+
+	/* Harvest {#...} taps from this stroke's own translation. */
+	e->n_combos = 0;
+	if (!untranslated) {
+		const char *t = sg->english;
+
+		for (const char *p = t; *p; p++) {
+			if (p[0] != '{' || p[1] != '#')
+				continue;
+			const char *q = strchr(p, '}');
+
+			if (!q)
+				break;
+			int got = steno_parse_combo(
+				p + 2, (size_t)(q - p - 2),
+				e->combo_buf + e->n_combos,
+				(unsigned)(STENO_MAX_COMBOS - e->n_combos));
+
+			if (got > 0)
+				e->n_combos = (uint8_t)(e->n_combos + got);
+			p = q;
+		}
+	}
 
 	return commit(e, true);
 }

@@ -17,6 +17,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include "steno_combo.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -44,6 +45,11 @@ extern "C" {
 #endif
 #ifndef STENO_UNDO_WIDTH
 #define STENO_UNDO_WIDTH 4
+#endif
+
+/* Key taps one stroke may emit via {#...}. */
+#ifndef STENO_MAX_COMBOS
+#define STENO_MAX_COMBOS 8
 #endif
 
 /* Rendered output window. Must exceed the longest run of text the retained
@@ -90,6 +96,15 @@ typedef struct {
 	uint16_t    backspaces;
 	const char *text;       /* NUL-terminated, owned by the engine */
 	uint16_t    text_len;
+
+	/*
+	 * Key taps from {#...} metas, to send after the text. Collected from
+	 * the stroke's own translation rather than from the rendered window,
+	 * so they fire once instead of on every re-render. Undo cannot
+	 * un-send them - Plover has the same limitation.
+	 */
+	const steno_key_combo *combos;
+	uint8_t                n_combos;
 } steno_action;
 
 /* Formatter state carried across the window head. */
@@ -134,6 +149,8 @@ typedef struct {
 	steno_fmt_state head;      /* state at the start of the retained window */
 
 	char     out[STENO_RENDER_BUF];   /* text of the last action */
+	steno_key_combo combo_buf[STENO_MAX_COMBOS];
+	uint8_t         n_combos;
 
 	steno_undo_rec undo[STENO_UNDO_DEPTH];
 	uint8_t        undo_head;

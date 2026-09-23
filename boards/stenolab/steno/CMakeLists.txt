@@ -18,6 +18,7 @@ if(CONFIG_STENO_ZMK)
   target_sources(app PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/steno/steno_engine.c
     ${CMAKE_CURRENT_SOURCE_DIR}/steno/steno_ortho.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/steno/steno_combo.c
     ${CMAKE_CURRENT_SOURCE_DIR}/steno/steno_zmk.c)
   target_include_directories(app PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/steno)
 endif()
