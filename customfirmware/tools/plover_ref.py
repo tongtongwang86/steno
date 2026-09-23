@@ -127,6 +127,8 @@ def main():
     ap.add_argument('--seed', type=int, default=1)
     ap.add_argument('--max-seq', type=int, default=6,
                     help='max strokes drawn from one dictionary entry')
+    ap.add_argument('--undo-rate', type=float, default=0.0,
+                    help='probability of injecting a * undo stroke')
     args = ap.parse_args()
 
     translator, cap, d = build(args.json)
@@ -145,7 +147,10 @@ def main():
         entry = random.choice(keys)
         if len(entry) > args.max_seq:
             continue
-        for s in entry:
+        seq = list(entry)
+        if args.undo_rate and random.random() < args.undo_rate:
+            seq.append('*')
+        for s in seq:
             try:
                 stroke = Stroke.from_steno(s)
             except Exception:

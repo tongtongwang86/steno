@@ -37,6 +37,15 @@ extern "C" {
 #define STENO_MAX_ENGLISH 96
 #endif
 
+/* How many strokes can be undone, and how many translations one stroke may
+ * have replaced and still be undoable. */
+#ifndef STENO_UNDO_DEPTH
+#define STENO_UNDO_DEPTH 8
+#endif
+#ifndef STENO_UNDO_WIDTH
+#define STENO_UNDO_WIDTH 4
+#endif
+
 /* Rendered output window. Must exceed the longest run of text the retained
  * segments can produce, or a re-segmentation could reach past the buffer. */
 #ifndef STENO_RENDER_BUF
@@ -98,6 +107,20 @@ typedef struct {
 	uint16_t render_off;    /* where this segment's text begins */
 } steno_segment;
 
+/*
+ * What one stroke changed, so it can be put back: it replaced the
+ * translations in [first_seg, n_seg) with one new one. A retirement during
+ * the same stroke only shifts first_seg - the retired text has been typed
+ * and stays on screen.
+ */
+typedef struct {
+	bool            valid;
+	uint8_t         first_seg;
+	uint8_t         n_replaced;
+	steno_fmt_state head;
+	steno_segment   replaced[STENO_UNDO_WIDTH];
+} steno_undo_rec;
+
 typedef struct {
 	steno_lookup_fn lookup;
 	void           *ctx;
@@ -112,10 +135,15 @@ typedef struct {
 
 	char     out[STENO_RENDER_BUF];   /* text of the last action */
 
+	steno_undo_rec undo[STENO_UNDO_DEPTH];
+	uint8_t        undo_head;
+	uint8_t        undo_n;
+
 	/* stats, for the diagnostics page */
 	uint32_t stat_strokes;
 	uint32_t stat_lookups;
 	uint32_t stat_untranslated;
+	uint32_t stat_undos;
 } steno_engine;
 
 /**

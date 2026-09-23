@@ -393,6 +393,8 @@ void steno_engine_reset(steno_engine *e)
 	e->head.space_next = true;
 	e->head.case_next = CASE_NONE;
 	e->head.last_glue = false;
+	e->undo_head = 0;
+	e->undo_n = 0;
 }
 
 static int try_lookup(steno_engine *e, const uint32_t *strokes, unsigned n,
@@ -545,9 +547,149 @@ static void render_all(steno_engine *e, char *buf, uint16_t cap, uint16_t *len,
 	*len = f.len;
 }
 
-steno_action steno_engine_stroke(steno_engine *e, uint32_t stroke)
+static steno_undo_rec *undo_push(steno_engine *e)
+{
+	e->undo_head = (uint8_t)((e->undo_head + 1) % STENO_UNDO_DEPTH);
+	if (e->undo_n < STENO_UNDO_DEPTH)
+		e->undo_n++;
+
+	steno_undo_rec *r = &e->undo[e->undo_head];
+
+	memset(r, 0, sizeof(*r));
+	r->valid = true;
+	return r;
+}
+
+static steno_undo_rec *undo_pop(steno_engine *e)
+{
+	if (e->undo_n == 0)
+		return NULL;
+
+	steno_undo_rec *r = &e->undo[e->undo_head];
+
+	e->undo_head = (uint8_t)((e->undo_head + STENO_UNDO_DEPTH - 1) %
+				 STENO_UNDO_DEPTH);
+	e->undo_n--;
+	return r->valid ? r : NULL;
+}
+
+/* Render the retained window and diff it against what was last emitted. */
+static steno_action commit(steno_engine *e, bool record)
 {
 	steno_action act = { 0, e->out, 0 };
+	char newbuf[STENO_RENDER_BUF];
+	uint16_t newlen = 0;
+	uint16_t starts[STENO_MAX_SEGMENTS];
+	steno_fmt_state state_at[STENO_MAX_SEGMENTS];
+
+	render_all(e, newbuf, sizeof(newbuf), &newlen, starts, state_at);
+
+	uint16_t common = 0;
+
+	while (common < newlen && common < e->render_len &&
+	       newbuf[common] == e->render[common])
+		common++;
+
+	act.backspaces = (uint16_t)(e->render_len - common);
+	act.text_len = (uint16_t)(newlen - common);
+	memcpy(e->out, newbuf + common, act.text_len);
+	e->out[act.text_len] = '\0';
+	act.text = e->out;
+
+	memcpy(e->render, newbuf, newlen);
+	e->render_len = newlen;
+	e->render[newlen] = '\0';
+
+	uint8_t keep_min = (uint8_t)(e->max_key + 1);
+
+	if (keep_min > STENO_MAX_SEGMENTS - 1)
+		keep_min = STENO_MAX_SEGMENTS - 1;
+
+	while (e->n_seg > keep_min &&
+	       (e->n_seg >= STENO_MAX_SEGMENTS ||
+		e->render_len > STENO_RENDER_BUF / 2)) {
+		uint16_t drop = starts[1];
+
+		/*
+		 * Retiring drops the oldest translation. Its text has already
+		 * been typed and stays on screen, so undo must NOT put it
+		 * back: re-inserting it lengthens the render at the front,
+		 * and a diff cannot express un-backspacing text that has
+		 * already scrolled out of the window - the whole window gets
+		 * re-emitted instead. All that is needed is to shift the
+		 * pending undo record's insertion point to match.
+		 */
+		if (record) {
+			steno_undo_rec *r = &e->undo[e->undo_head];
+
+			if (r->valid) {
+				if (r->first_seg > 0)
+					r->first_seg--;
+				else
+					r->valid = false;  /* it retired itself */
+			}
+		}
+
+		memmove(e->render, e->render + drop, e->render_len - drop);
+		e->render_len -= drop;
+		e->render[e->render_len] = '\0';
+		memmove(&e->seg[0], &e->seg[1],
+			(e->n_seg - 1) * sizeof(steno_segment));
+		e->n_seg--;
+		e->head = state_at[1];
+		for (uint8_t i = 0; i + 1 < STENO_MAX_SEGMENTS; i++) {
+			starts[i] = (uint16_t)(starts[i + 1] - drop);
+			state_at[i] = state_at[i + 1];
+		}
+	}
+
+	return act;
+}
+
+/*
+ * Plover treats a lone '*' with no dictionary entry as the undo stroke
+ * (Stroke.is_correction), and "=undo" as the explicit macro.
+ */
+static bool is_undo_stroke(steno_engine *e, uint32_t stroke)
+{
+	char t[STENO_MAX_ENGLISH];
+
+	if (stroke == STENO_STAR)
+		return try_lookup(e, &stroke, 1, t, sizeof(t)) < 0;
+
+	if (try_lookup(e, &stroke, 1, t, sizeof(t)) >= 0)
+		return strcmp(t, "=undo") == 0;
+	return false;
+}
+
+static steno_action do_undo(steno_engine *e)
+{
+	steno_undo_rec *r = undo_pop(e);
+
+	e->stat_undos++;
+
+	if (!r) {
+		/* Nothing recoverable: say so by emitting nothing. */
+		e->out[0] = '\0';
+		steno_action none = { 0, e->out, 0 };
+
+		return none;
+	}
+
+	if (r->first_seg > e->n_seg)
+		r->first_seg = e->n_seg;
+	e->n_seg = r->first_seg;
+
+	for (uint8_t i = 0; i < r->n_replaced &&
+	     e->n_seg < STENO_MAX_SEGMENTS; i++)
+		e->seg[e->n_seg++] = r->replaced[i];
+
+	return commit(e, false);
+}
+
+steno_action steno_engine_stroke(steno_engine *e, uint32_t stroke)
+{
+
 	char english[STENO_MAX_ENGLISH];
 	uint32_t strokes[STENO_MAX_KEY];
 	uint8_t first_seg = e->n_seg;
@@ -556,6 +698,9 @@ steno_action steno_engine_stroke(steno_engine *e, uint32_t stroke)
 
 	stroke &= STENO_KEY_MASK;
 	e->stat_strokes++;
+
+	if (is_undo_stroke(e, stroke))
+		return do_undo(e);
 
 	/* 1. longest multi-stroke match (>= 2 strokes) */
 	int k = find_longest(e, stroke, 2, english, sizeof(english),
@@ -586,9 +731,25 @@ steno_action steno_engine_stroke(steno_engine *e, uint32_t stroke)
 		}
 	}
 
-	/* Replace segments [first_seg .. n_seg) with the new one. */
+	/* Remember what this stroke is about to overwrite, for undo. */
 	if (first_seg > STENO_MAX_SEGMENTS - 1)
 		first_seg = STENO_MAX_SEGMENTS - 1;
+
+	steno_undo_rec *rec = undo_push(e);
+
+	rec->first_seg = first_seg;
+	rec->head = e->head;
+	uint8_t nrep = (uint8_t)(e->n_seg - first_seg);
+
+	if (nrep > STENO_UNDO_WIDTH) {
+		rec->valid = false;
+	} else {
+		rec->n_replaced = nrep;
+		for (uint8_t i = 0; i < nrep; i++)
+			rec->replaced[i] = e->seg[first_seg + i];
+	}
+
+	/* Replace segments [first_seg .. n_seg) with the new one. */
 	e->n_seg = first_seg;
 
 	steno_segment *sg = &e->seg[e->n_seg];
@@ -607,62 +768,5 @@ steno_action steno_engine_stroke(steno_engine *e, uint32_t stroke)
 	}
 	e->n_seg++;
 
-	/* Re-render and diff against what we last emitted. */
-	char newbuf[STENO_RENDER_BUF];
-	uint16_t newlen = 0;
-	uint16_t starts[STENO_MAX_SEGMENTS];
-	steno_fmt_state state_at[STENO_MAX_SEGMENTS];
-
-	render_all(e, newbuf, sizeof(newbuf), &newlen, starts, state_at);
-
-	uint16_t common = 0;
-
-	while (common < newlen && common < e->render_len &&
-	       newbuf[common] == e->render[common])
-		common++;
-
-	act.backspaces = (uint16_t)(e->render_len - common);
-	act.text_len = (uint16_t)(newlen - common);
-	memcpy(e->out, newbuf + common, act.text_len);
-	e->out[act.text_len] = '\0';
-	act.text = e->out;
-
-	memcpy(e->render, newbuf, newlen);
-	e->render_len = newlen;
-	e->render[newlen] = '\0';
-
-	/*
-	 * Retire the oldest segments, trimming the same bytes off the render
-	 * so the next diff still lines up at offset 0, and adopting the
-	 * formatter state that applied at the new head.
-	 *
-	 * Bounded by the render buffer as well as the segment count: a run of
-	 * long translations would otherwise overflow the buffer and silently
-	 * corrupt every subsequent diff. Never retire below the history the
-	 * longest dictionary key could still need for re-segmentation.
-	 */
-	uint8_t keep_min = (uint8_t)(e->max_key + 1);
-
-	if (keep_min > STENO_MAX_SEGMENTS - 1)
-		keep_min = STENO_MAX_SEGMENTS - 1;
-
-	while (e->n_seg > keep_min &&
-	       (e->n_seg >= STENO_MAX_SEGMENTS ||
-		e->render_len > STENO_RENDER_BUF / 2)) {
-		uint16_t drop = starts[1];
-
-		memmove(e->render, e->render + drop, e->render_len - drop);
-		e->render_len -= drop;
-		e->render[e->render_len] = '\0';
-		memmove(&e->seg[0], &e->seg[1],
-			(e->n_seg - 1) * sizeof(steno_segment));
-		e->n_seg--;
-		e->head = state_at[1];
-		for (uint8_t i = 0; i + 1 < STENO_MAX_SEGMENTS; i++) {
-			starts[i] = (uint16_t)(starts[i + 1] - drop);
-			state_at[i] = state_at[i + 1];
-		}
-	}
-
-	return act;
+	return commit(e, true);
 }
