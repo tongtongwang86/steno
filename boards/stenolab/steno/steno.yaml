@@ -1,0 +1,15 @@
+identifier: steno/nrf52840/zmk
+name: steno
+type: keyboard
+arch: arm
+toolchain:
+  - zephyr
+  - gnuarmemb
+  - xtools
+ram: 256
+flash: 1024
+supported:
+  - usb_device
+  - ble
+  - i2c
+  - gpio

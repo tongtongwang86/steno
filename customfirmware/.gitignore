@@ -1,0 +1,7 @@
+# Build artifacts - regenerate with tools/mkdict.py and west build
+flash/
+*.sdic
+main.json
+sim/sim
+sim/zephyr/
+sim/zmk/

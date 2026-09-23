@@ -19,4 +19,4 @@
 #
 ---
 include:
-  - board: steno
+  - board: steno/nrf52840/zmk

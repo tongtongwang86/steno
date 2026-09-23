@@ -1,0 +1,60 @@
+# SPDX-License-Identifier: MIT
+menuconfig STENO_DISPLAY
+	bool "Steno OLED tape/status display"
+	depends on DISPLAY
+	help
+	  Direct-framebuffer SSD1306 display. Alternative to ZMK_DISPLAY,
+	  which selects LVGL non-overridably. Do not enable both.
+
+if STENO_DISPLAY
+config STENO_DISPLAY_COALESCE_MS
+	int "Redraw coalescing window (ms)"
+	default 8
+config STENO_DISPLAY_STACK_SIZE
+	int "Display thread stack size"
+	default 1024
+config STENO_DISPLAY_THREAD_PRIORITY
+	int "Display thread priority"
+	default 10
+module = STENO_DISPLAY
+module-str = STENO_DISPLAY
+source "subsys/logging/Kconfig.template.log_config"
+endif
+
+config STENO_DICT
+	bool "Compressed steno dictionary reader"
+	default y
+	help
+	  Reads the SDIC image from dict_partition in internal flash.
+
+if STENO_DICT
+module = STENO_DICT
+module-str = STENO_DICT
+source "subsys/logging/Kconfig.template.log_config"
+endif
+
+config STENO_ZMK
+	bool "Steno translation and HID output"
+	default y
+	depends on STENO_DICT
+	help
+	  Accumulates chords from key positions, translates them with the
+	  on-device dictionary, and types the result over USB/BLE HID.
+
+if STENO_ZMK
+config STENO_ZMK_TAP_MS
+	int "Delay between HID reports (ms)"
+	default 4
+	help
+	  Hosts drop keystrokes if reports arrive faster than they poll.
+	  4ms is one USB frame plus margin.
+config STENO_ZMK_STACK_SIZE
+	int "Steno thread stack size"
+	default 4096
+config STENO_ZMK_THREAD_PRIORITY
+	int "Steno thread priority"
+	default 8
+module = STENO_ZMK
+module-str = STENO_ZMK
+source "subsys/logging/Kconfig.template.log_config"
+endif
